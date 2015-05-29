@@ -54,7 +54,7 @@
 		</dependency>
 	</dependencies>
 	<scm>
-		<connection>scm:git:ssh://git@github.com/SoffidIAM/iam2/plugin-scim.git</connection>
+		<connection>scm:git:ssh://git@github.com/SoffidIAM/plugin-scim.git</connection>
 		<tag>scim-plugin-1.0.0</tag>
 	</scm>
 	<licenses>
