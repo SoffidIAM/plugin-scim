@@ -56,7 +56,7 @@
 		</dependency>
 	</dependencies>
 	<scm>
-		<connection>scm:git:ssh://git@stash.dev.lab:7999/iam2/plugin-ldap.git</connection>
+		<connection>scm:git:ssh://git@github.com/SoffidIAM/iam2/plugin-scim.git</connection>
 		<tag>HEAD</tag>
 	</scm>
 	<licenses>
