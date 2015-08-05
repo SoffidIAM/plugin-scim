@@ -10,7 +10,7 @@
 	<artifactId>scim-plugin</artifactId>
 	<packaging>jar</packaging>
 	<name>SCIM plugin</name>
-	<version>1.0.1-SNAPSHOT</version>
+	<version>1.0.1</version>
 	<dependencies>
 		<dependency>
 			<groupId>com.soffid.iam.sync</groupId>
@@ -55,7 +55,7 @@
 	</dependencies>
 	<scm>
 		<connection>scm:git:ssh://git@github.com/SoffidIAM/plugin-scim.git</connection>
-		<tag>HEAD</tag>
+		<tag>scim-plugin-1.0.1</tag>
 	</scm>
 	<licenses>
 		<license>
