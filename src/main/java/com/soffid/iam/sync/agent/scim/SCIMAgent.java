@@ -17,7 +17,6 @@ import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.wink.client.ClientConfig;
 import org.apache.wink.client.ClientResponse;
 import org.apache.wink.client.RestClient;
-import org.apache.wink.client.handlers.BasicAuthSecurityHandler;
 import org.apache.wink.client.httpclient.ApacheHttpClientConfig;
 import org.apache.wink.common.http.HttpStatus;
 import org.json.JSONArray;
@@ -68,6 +67,10 @@ import es.caib.seycon.ng.sync.intf.UserMgr;
 public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, ReconcileMgr2, GroupMgr, RoleMgr,
 	AuthoritativeIdentitySource2 {
 
+	private String EQ_END = "\"";
+
+	private String EQ_BEGIN = " eq \"";
+
 	private static final long serialVersionUID = 1L;
 
 	ValueObjectMapper vom = new ValueObjectMapper();
@@ -75,6 +78,8 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 	ObjectTranslator objectTranslator = null;
 	
 	boolean debugEnabled;
+	
+	boolean wso2workaround;
 
 	/** Usuario root de conexión LDAP */
 	String loginDN;
@@ -120,7 +125,13 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		authUrl = getDispatcher().getParam3();
 		serverUrl = getDispatcher().getParam4();
 		debugEnabled = "true".equals(getDispatcher().getParam8());
+		wso2workaround = "true".equals(getDispatcher().getParam8());
 
+		if (wso2workaround) 
+		{
+			EQ_BEGIN = "Eq";
+			EQ_END = "";
+		}
 		// create a client to send the user/group crud requests
 		config = new ApacheHttpClientConfig(new DefaultHttpClient());
 		if ("token".equals(authMethod))
@@ -156,11 +167,11 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 					{
 						AttributeReference ar = AttributeReferenceParser.parse(null, property);
 						String ft = getJsonReference(ar);
-						String query = ft+" gt \""+lastChange+"\"";
-						path = getObjectPath(mapping.getSystemObject())+"?ﬁlter="+query+"&sortBy="+ft+"&sortOrder=ascending";
+						String query = ft+" gt \""+lastChange+EQ_END;
+						path = getObjectPath(mapping.getSystemObject())+"?filter="+query+"&sortBy="+ft+"&sortOrder=ascending";
 					}
 					else
-						path = getObjectPath(mapping.getSystemObject())+"?ﬁlter=&sortBy=&sortOrder=";
+						path = getObjectPath(mapping.getSystemObject())+"?filter=&sortBy=&sortOrder=";
 
 					if (debugEnabled)
 						log.info("Querying for authoritative changes: "+path);
@@ -241,11 +252,20 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 			try {
 				for (ExtensibleObjectMapping eom: objectMappings)
 				{
-					if (! "true".equals( eom.getProperties().get("preventDeletion")))
+					if (eom.getSoffidObject().equals (SoffidObjectType.OBJECT_ROLE))
 					{
-						ExtensibleObject obj = objectTranslator.generateObject(roleObject, eom);
-						if (obj != null)
-							removeObject(obj);
+						if (! "true".equals( eom.getProperties().get("preventDeletion")))
+						{
+							String condition = eom.getCondition();
+							eom.setCondition(null);
+							try {
+								ExtensibleObject obj = objectTranslator.generateObject(roleObject, eom);
+								if (obj != null)
+									removeObject(obj);
+							} finally { 
+								eom.setCondition(condition);
+							}
+						}
 					}
 				}
 			}
@@ -298,14 +318,19 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 				// If the response is no content, it should not be parsed
 				if (response.getStatusCode() == HttpStatus.OK.getCode())
 				{
-					JSONObject result = response.getEntity(JSONObject.class);
-					if (debugEnabled)
+					if (wso2workaround)
+						response.consumeContent();
+					else
 					{
-						log.info ("Response :"+ result.toString(10));
+						JSONObject result = response.getEntity(JSONObject.class);
+						if (debugEnabled)
+						{
+							log.info ("Response :"+ result.toString(10));
+						}
+						JSONArray errors = result.optJSONArray("Errors");
+						if (errors != null)
+							throw new InternalErrorException ("Error creating object: "+errors);
 					}
-					JSONArray errors = result.optJSONArray("Errors");
-					if (errors != null)
-						throw new InternalErrorException ("Error creating object: "+errors);
 				}
 			}
 		}
@@ -329,16 +354,18 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 	
 				for (ExtensibleObjectMapping mapping: objectMappings)
 				{
-					if (mapping.getSoffidObject().equals (SoffidObjectType.OBJECT_ROLE) &&
-							objectTranslator.evalCondition(sourceObject, mapping))
+					if (mapping.getSoffidObject().equals (SoffidObjectType.OBJECT_ROLE))
 					{
-		    			ExtensibleObject obj = objectTranslator.generateObject(sourceObject, mapping);
-		    			if (obj != null)
-		    				updateObject(obj);
-					}
-					else
-					{
-						removeRole(rol.getNom(), rol.getBaseDeDades());
+						if (objectTranslator.evalCondition(sourceObject, mapping))
+						{
+			    			ExtensibleObject obj = objectTranslator.generateObject(sourceObject, mapping);
+			    			if (obj != null)
+			    				updateObject(obj);
+						}
+						else
+						{
+							removeRole(rol.getNom(), rol.getBaseDeDades());
+						}
 					}
 				}
 			}
@@ -362,9 +389,15 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 			{
 				if (! "true".equals( eom.getProperties().get("preventDeletion")))
 				{
-					ExtensibleObject obj = objectTranslator.generateObject(groupObject, eom);
-					if (obj != null)
-						removeObject(obj);
+					String condition = eom.getCondition();
+					eom.setCondition(null);
+					try {
+						ExtensibleObject obj = objectTranslator.generateObject(groupObject, eom);
+						if (obj != null)
+							removeObject(obj);
+					} finally { 
+						eom.setCondition(condition);
+					}
 				}
 			}
 		}
@@ -419,69 +452,80 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 			{
 				if (mapping.getSoffidObject().equals (SoffidObjectType.OBJECT_ACCOUNT))
 				{
-					ExtensibleObject scimObj = objectTranslator.generateObject(new AccountExtensibleObject(account, getServer()), mapping);
-					if (scimObj != null)
-					{
-						ExtensibleObject scimStoredObject = searchJsonObject(scimObj);
-						if (scimStoredObject != null)
+					String condition = mapping.getCondition();
+					try {
+						mapping.setCondition(null);
+						ExtensibleObject scimObj = objectTranslator.generateObject(new AccountExtensibleObject(account, getServer()), mapping);
+						if (scimObj != null)
 						{
-							List<Object> groups = (List<Object>) scimStoredObject.get("groups");
-							if (groups != null)
+							ExtensibleObject scimStoredObject = searchJsonObject(scimObj);
+							if (scimStoredObject != null)
 							{
-								for (Object group: groups)
+								List<Object> groups = (List<Object>) scimStoredObject.get("groups");
+								if (groups != null)
 								{
-									String id;
-									String ref= null;
-									if (group instanceof Map)
+									for (Object group: groups)
 									{
-										id = (String) ((Map)group).get("id");
-										ref = (String) ((Map)group).get("ref");
-									}
-									else
-										id = group.toString();
-									if (ref != null || id != null)
-									{
-										for (ExtensibleObjectMapping roleMapping: objectMappings)
+										String id;
+										String ref= null;
+										if (group instanceof Map)
 										{
-											if ( roleMapping.getSoffidObject().equals (SoffidObjectType.OBJECT_ROLE))
+											if (wso2workaround)
 											{
-												if (ref == null)
-													ref = getObjectPath(roleMapping.getSystemObject()) + "/"+id;
-												
-												ClientResponse response = client
-														.resource(ref)
-														.accept(MediaType.APPLICATION_JSON)
-														.get();
-												if (response.getStatusCode() != HttpStatus.OK.getCode())
+												id = (String) ((Map)group).get("value");
+											} else {
+												id = (String) ((Map)group).get("id");
+												ref = (String) ((Map)group).get("ref");
+											}
+										}
+										else
+											id = group.toString();
+										if (ref != null || id != null)
+										{
+											for (ExtensibleObjectMapping roleMapping: objectMappings)
+											{
+												if ( roleMapping.getSoffidObject().equals (SoffidObjectType.OBJECT_ROLE))
 												{
-													response.consumeContent();
-													throw new InternalErrorException ("Unexpected status "+
-															response.getStatusCode()+":"+
-															response.getStatusType().getReasonPhrase()+" on "+
-															ref);
-												}
-												
-												ExtensibleObject gotRole = new ExtensibleObject();
-												gotRole.setObjectType(roleMapping.getSystemObject());
-												json2map(response.getEntity(JSONObject.class), gotRole);
-												Rol r = vom.parseRol(objectTranslator.parseInputObject(gotRole,roleMapping));
-												if (r != null)
-												{
-													RolGrant rg = new RolGrant();
-													rg.setDispatcher(getCodi());
-													rg.setEnabled(true);
-													rg.setOwnerAccountName(accountName);
-													rg.setOwnerDispatcher(getCodi());
-													rg.setRolName(r.getNom());
-													grants.add(rg);
+													if (ref == null)
+														ref = getObjectPath(roleMapping.getSystemObject()) + "/"+id;
+													
+													ClientResponse response = client
+															.resource(ref)
+															.accept(MediaType.APPLICATION_JSON)
+															.get();
+													if (response.getStatusCode() != HttpStatus.OK.getCode())
+													{
+														response.consumeContent();
+														throw new InternalErrorException ("Unexpected status "+
+																response.getStatusCode()+":"+
+																response.getStatusType().getReasonPhrase()+" on "+
+																ref);
+													}
+													
+													ExtensibleObject gotRole = new ExtensibleObject();
+													gotRole.setObjectType(roleMapping.getSystemObject());
+													json2map(response.getEntity(JSONObject.class), gotRole);
+													Rol r = vom.parseRol(objectTranslator.parseInputObject(gotRole,roleMapping));
+													if (r != null)
+													{
+														RolGrant rg = new RolGrant();
+														rg.setDispatcher(getCodi());
+														rg.setEnabled(true);
+														rg.setOwnerAccountName(accountName);
+														rg.setOwnerDispatcher(getCodi());
+														rg.setRolName(r.getNom());
+														grants.add(rg);
+													}
 												}
 											}
 										}
+												
 									}
-											
 								}
 							}
 						}
+					} finally {
+						mapping.setCondition(condition);
 					}
 				}
 			}
@@ -504,20 +548,26 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 					acc.setName(accountName);
 					acc.setDispatcher(getCodi());
 					acc.setDisabled(false);
-					ExtensibleObject scimObj = objectTranslator.generateObject(new AccountExtensibleObject(acc, getServer()), mapping);
-					if (scimObj != null)
-					{
-						if (debugEnabled)
-							debugObject("Looking for object", scimObj, "");
-						ExtensibleObject scimStoredObject = searchJsonObject(scimObj);
-						if (scimStoredObject != null)
+					String condition = mapping.getCondition();
+					try {
+						mapping.setCondition(null);
+						ExtensibleObject scimObj = objectTranslator.generateObject(new AccountExtensibleObject(acc, getServer()), mapping);
+						if (scimObj != null)
 						{
-							debugObject("got object", scimStoredObject, "");
-							
-							acc = vom.parseAccount( objectTranslator.parseInputObject(scimStoredObject, mapping));
-							if (acc != null)
-								return acc;
+							if (debugEnabled)
+								debugObject("Looking for object", scimObj, "");
+							ExtensibleObject scimStoredObject = searchJsonObject(scimObj);
+							if (scimStoredObject != null)
+							{
+								debugObject("got object", scimStoredObject, "");
+								
+								acc = vom.parseAccount( objectTranslator.parseInputObject(scimStoredObject, mapping));
+								if (acc != null)
+									return acc;
+							}
 						}
+					} finally {
+						mapping.setCondition(condition);
 					}
 				}
 			}
@@ -538,7 +588,9 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 			{
 				if (mapping.getSoffidObject().equals(SoffidObjectType.OBJECT_ACCOUNT))
 				{
-					String path = getObjectPath(mapping.getSystemObject())+"?ﬁlter=&sortBy=&sortOrder=";
+					String path = getObjectPath(mapping.getSystemObject());
+					if ( !wso2workaround)
+						path = path + "?filter=&sortBy=&sortOrder=";
 					if (debugEnabled)
 						log.info("Querying for role list: "+path);
 					ClientResponse response = client
@@ -546,33 +598,39 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 							.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 							.accept(MediaType.APPLICATION_JSON)
 							.get();
-					if (response.getStatusCode() != HttpStatus.OK.getCode())
+					if (wso2workaround && 
+							response.getStatusCode() == HttpStatus.NOT_FOUND.getCode())
+					{
+						// No role exists yet
+						response.consumeContent();
+					} else if (response.getStatusCode() != HttpStatus.OK.getCode())
 					{
 						response.consumeContent();
 						throw new InternalErrorException ("Unexpected status "+
 								response.getStatusCode()+":"+
 								response.getStatusType().getReasonPhrase()+" on "+
 								path);
-					}
-					JSONObject respOb  = response.getEntity(JSONObject.class);
-					JSONArray array = respOb.optJSONArray("Resources");
-					if (array == null)
-							throw new InternalErrorException ("Expecting a JSON array from path "+path+ " and got "+respOb.toString(2));
-					if (debugEnabled)
-						log.info("Got "+array.length()+" accounts");
-					for (int i = 0; i < array.length(); i++)
-					{
-						JSONObject inputJsonObject = array.getJSONObject(i);
+					} else {
+						JSONObject respOb  = response.getEntity(JSONObject.class);
+						JSONArray array = respOb.optJSONArray("Resources");
+						if (array == null)
+								throw new InternalErrorException ("Expecting a JSON array from path "+path+ " and got "+respOb.toString(2));
 						if (debugEnabled)
-							log.info("Got JSON Object "+inputJsonObject.toString(2));
-						ExtensibleObject inputExtensibleObject = new ExtensibleObject();
-						inputExtensibleObject.setObjectType(mapping.getSystemObject());
-						json2map(inputJsonObject, inputExtensibleObject);
-						String accountName = (String) objectTranslator.parseInputAttribute("accountName", inputExtensibleObject, mapping);
-						if (debugEnabled)
-							log.info ("Soffid account name="+accountName);
-						if ( accountName != null)
-							accounts.add(accountName);
+							log.info("Got "+array.length()+" accounts");
+						for (int i = 0; i < array.length(); i++)
+						{
+							JSONObject inputJsonObject = array.getJSONObject(i);
+							if (debugEnabled)
+								log.info("Got JSON Object "+inputJsonObject.toString(2));
+							ExtensibleObject inputExtensibleObject = new ExtensibleObject();
+							inputExtensibleObject.setObjectType(mapping.getSystemObject());
+							json2map(inputJsonObject, inputExtensibleObject);
+							String accountName = (String) objectTranslator.parseInputAttribute("accountName", inputExtensibleObject, mapping);
+							if (debugEnabled)
+								log.info ("Soffid account name="+accountName);
+							if ( accountName != null)
+								accounts.add(accountName);
+						}
 					}
 				}
 			}
@@ -593,16 +651,22 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 					Rol role = new Rol();
 					role.setNom(roleName);
 					role.setBaseDeDades(getCodi());
-					ExtensibleObject scimObj = objectTranslator.generateObject(new RoleExtensibleObject(role, getServer()), mapping);
-					if (scimObj != null)
-					{
-						ExtensibleObject scimStoredObject = searchJsonObject(scimObj);
-						if (scimStoredObject != null)
+					String condition = mapping.getCondition();
+					try {
+						mapping.setCondition(null);
+						ExtensibleObject scimObj = objectTranslator.generateObject(new RoleExtensibleObject(role, getServer()), mapping);
+						if (scimObj != null)
 						{
-							role  = vom.parseRol(objectTranslator.parseInputObject(scimStoredObject, mapping));
-							if (role != null)
-								return role;
+							ExtensibleObject scimStoredObject = searchJsonObject(scimObj);
+							if (scimStoredObject != null)
+							{
+								role  = vom.parseRol(objectTranslator.parseInputObject(scimStoredObject, mapping));
+								if (role != null)
+									return role;
+							}
 						}
+					} finally {
+						mapping.setCondition(condition);
 					}
 				}
 			}
@@ -623,7 +687,9 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 			{
 				if (mapping.getSoffidObject().equals(SoffidObjectType.OBJECT_ROLE))
 				{
-					String path = getObjectPath(mapping.getSystemObject())+"?ﬁlter=&sortBy=&sortOrder=";
+					String path = getObjectPath(mapping.getSystemObject());
+					if ( !wso2workaround)
+						path = path + "?filter=&sortBy=&sortOrder=";
 					if (debugEnabled)
 						log.info("Querying for role list: "+path);
 					ClientResponse response = client
@@ -631,37 +697,43 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 							.contentType(MediaType.APPLICATION_FORM_URLENCODED)
 							.accept(MediaType.APPLICATION_JSON)
 							.get();
-					if (response.getStatusCode() != HttpStatus.OK.getCode())
+					if (wso2workaround && 
+							response.getStatusCode() == HttpStatus.NOT_FOUND.getCode())
+					{
+						// No role exists yet
+						response.consumeContent();
+					} else if (response.getStatusCode() != HttpStatus.OK.getCode())
 					{
 						response.consumeContent();
 						throw new InternalErrorException ("Unexpected status "+
 								response.getStatusCode()+":"+
 								response.getStatusType().getReasonPhrase()+" on "+
 								path);
-					}
-					JSONObject respOb  = response.getEntity(JSONObject.class);
-					JSONArray array = respOb.optJSONArray("Resources");
-					if (array == null)
-							throw new InternalErrorException ("Expecting a JSON array from path "+path+ " and got "+respOb.toString(2));
-					if (debugEnabled)
-						log.info("Got "+array.length()+" roles");
-					for (int i = 0; i < array.length(); i++)
-					{
-						JSONObject inputJsonObject = array.getJSONObject(i);
-						ExtensibleObject inputExtensibleObject = new ExtensibleObject();
-						inputExtensibleObject.setObjectType(mapping.getSystemObject());
-						json2map(inputJsonObject, inputExtensibleObject);
-						String accountName = (String) objectTranslator.parseInputAttribute("name", inputExtensibleObject, mapping);
-						if ( accountName != null)
+					} else {
+						JSONObject respOb  = response.getEntity(JSONObject.class);
+						JSONArray array = respOb.optJSONArray("Resources");
+						if (array == null)
+								throw new InternalErrorException ("Expecting a JSON array from path "+path+ " and got "+respOb.toString(2));
+						if (debugEnabled)
+							log.info("Got "+array.length()+" roles");
+						for (int i = 0; i < array.length(); i++)
 						{
-							accounts.add(accountName);
-							if (debugEnabled)
-								log.info ("Parsed role "+ accountName);
-						}
-						else
-						{
-							if (debugEnabled)
-								log.info ("Unable to parse role name from JSON object:"+ inputJsonObject.toString(4));
+							JSONObject inputJsonObject = array.getJSONObject(i);
+							ExtensibleObject inputExtensibleObject = new ExtensibleObject();
+							inputExtensibleObject.setObjectType(mapping.getSystemObject());
+							json2map(inputJsonObject, inputExtensibleObject);
+							String accountName = (String) objectTranslator.parseInputAttribute("name", inputExtensibleObject, mapping);
+							if ( accountName != null)
+							{
+								accounts.add(accountName);
+								if (debugEnabled)
+									log.info ("Parsed role "+ accountName);
+							}
+							else
+							{
+								if (debugEnabled)
+									log.info ("Unable to parse role name from JSON object:"+ inputJsonObject.toString(4));
+							}
 						}
 					}
 				}
@@ -701,9 +773,15 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 			{
 				if (! "true".equals( eom.getProperties().get("preventDeletion")))
 				{
-					ExtensibleObject obj = objectTranslator.generateObject(userObject, eom);
-					if (obj != null)
-						removeObject(obj);
+					String condition = eom.getCondition();
+					eom.setCondition(null);
+					try {
+						ExtensibleObject obj = objectTranslator.generateObject(userObject, eom);
+						if (obj != null)
+							removeObject(obj);
+					} finally { 
+						eom.setCondition(condition);
+					}
 				}
 			}
 		}
@@ -849,7 +927,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		
 		String ft = getJsonReference(ar);
 		
-		String path = getObjectPath(object) + "?filter="+URLEncoder.encode(ft+" eq \""+key.toString()+"\"", "UTF-8")+"&sortBy=&sortOrder=";
+		String path = getObjectPath(object) + "?filter="+URLEncoder.encode(ft+EQ_BEGIN+key.toString()+EQ_END, "UTF-8")+"&sortBy=&sortOrder=";
 		
 		if (debugEnabled)
 			log.info ("Searching for object. Path: "+path);
@@ -859,6 +937,11 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 				.accept(MediaType.APPLICATION_JSON)
 				.get();
 		
+		if (wso2workaround && response.getStatusCode() == HttpStatus.NOT_FOUND.getCode())
+		{
+			response.consumeContent();
+			return null;
+		}
 		if (response.getStatusCode() != HttpStatus.OK.getCode())
 		{
 			response.consumeContent();
@@ -1139,6 +1222,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 			}
 			else if (obj instanceof Map)
 			{
+				log.info (indent+attributeName+":");
 				Map<String,Object> m = (Map<String, Object>) obj;
 				for (String attribute: m.keySet())
 				{
