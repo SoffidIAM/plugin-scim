@@ -3,74 +3,42 @@
 <seuServerPlugin xmlns="http://seu.sourceforge.net/schema/serverplugin"
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://seu.sourceforge.net/schema/ServerPlugin.xsd">
-	<name>SCIM plugin</name>
+	<name>REST Web service plugin</name>
 	<version>${pom.version}</version>
 	<agent>
-		<name>SCIM</name>
-		<javaClass>com.soffid.iam.sync.agent.scim.SCIMAgent</javaClass>
-		<userInterface>SCIMAgent.zul</userInterface>
+		<name>JSON Rest webservice</name>
+		<javaClass>com.soffid.iam.sync.agent.json.JSONAgent</javaClass>
+		<javaClassV2>com.soffid.iam.sync.agent2.json.JSONAgent</javaClassV2>
+		<userInterface>JSONAgent.zul</userInterface>
 		<enableAccessControl>false</enableAccessControl>
 		<authoritativeSource>true</authoritativeSource>
 		<enableAttributeMapping>true</enableAttributeMapping>
+		<enableObjectTriggers>true</enableObjectTriggers>
 
-		<object systemObject="user" soffidObject="user">
-			<property name="path" value="/Users"/>
-
-			<mapping
-				soffidAttribute='accountName'
-				systemAttribute='userName' 
-				direction="inout" />
-			<mapping soffidAttribute='givenName' 
-				systemAttribute='name{"givenName"}'
-				direction="inout" />
-			<mapping soffidAttribute='fullName' 
-				systemAttribute='name{"formatted"}'
-				direction="inout" />
-			<mapping soffidAttribute='lastName' 
-				systemAttribute='name{"familyName"}'
-				direction="inout" />
-			<mapping soffidAttribute='lastName2' 
-				systemAttribute='name{"middleName"}'
-				direction="inout" />
-			<mapping soffidAttribute='accountDescription' 
-				systemAttribute='displayName'
-				direction="inout" />
-			<mapping
-				soffidAttribute='l = new java.util.LinkedList(); if (shortName!=null &amp;&amp; mailDomain != null) { s = new java.util.HashSet(); s.put("value", shortName+"@"+mailDomain); s.put ("type", "work" ))l.add ()? attributes{"MAIL"} : shortName+"@"+mailDomain'
-				systemAttribute='emails' direction="out" />
-			<mapping soffidAttribute='primaryGroup' systemAttribute='departmentNumber'
-				direction="out" />
-			<mapping soffidAttribute='primaryGroup' systemAttribute='departmentNumber == null ? "enterprise" : departmentNumber'
-				direction="in" />
-			<mapping soffidAttribute='attributes{"employeeNumber"}' systemAttribute='employeeNumber'
-							direction="inout" />
-			<mapping soffidAttribute='attributes{"employeeType"}' systemAttribute='employeeType'
-							direction="inout" />
-			<mapping soffidAttribute='accountName' systemAttribute='externalId'
-				direction="inout" />
-		</object>
-
-		<object systemObject="account" soffidObject="account">
-			<property name="path" value="/Users"/>
-
-			<mapping
-				soffidAttribute='accountName'
-				systemAttribute='userName' 
-				direction="inout" />
-			<mapping soffidAttribute='accountDescription' 
-				systemAttribute='displayName'
-				direction="inout" />
-			<mapping soffidAttribute='accountName' systemAttribute='externalId'
-				direction="inout" />
-		</object>
-
-		<object systemObject="role" soffidObject="role">
-			<property name="path" value="/Groups"/>
-			<mapping soffidAttribute='name' systemAttribute='externalId'
-				direction="inout" />
-			<mapping soffidAttribute='description' systemAttribute='displayName'
-				direction="inout" />
-		</object>
+		<objectMapping condition="" soffidObject="account"
+			systemObject="account">
+			<property name="insertEncoding" value="application/json" />
+			<property name="insertMethod" value="POST" />
+			<property name="insertPath" value="/rest/api/2/user" />
+			<property name="loadMethod" value="GET" />
+			<property name="loadParams" value="-" />
+			<property name="loadPath" value="/rest/api/2/user/search?username=-" />
+			<property name="selectMethod" value="GET" />
+			<property name="selectParams" value="-" />
+			<property name="selectPath" value="/rest/api/2/user?username=${name}" />
+			<property name="updateEncoding" value="application/json" />
+			<property name="updateMethod" value="PUT" />
+			<property name="updatePath" value="/rest/api/2/user?username=${name}" />
+			<attributeMapping direction="INPUTOUTPUT"
+				soffidAttribute="accountName" systemAttribute="name" />
+			<attributeMapping direction="INPUTOUTPUT"
+				soffidAttribute="accountDescription" systemAttribute="displayName" />
+			<attributeMapping direction="OUTPUT"
+				soffidAttribute="password" systemAttribute="password" />
+			<attributeMapping direction="OUTPUT"
+				soffidAttribute="accountName+&quot;@nowhere.com&quot;"
+				systemAttribute="emailAddress" />
+		</objectMapping>
 
 
 	</agent>

@@ -1,4 +1,4 @@
-package com.soffid.iam.sync.agent.scim;
+package com.soffid.iam.sync.agent.json;
 
 import java.net.URLEncoder;
 import java.util.LinkedList;
