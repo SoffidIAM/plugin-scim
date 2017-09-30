@@ -10,7 +10,7 @@
 	<artifactId>rest-plugin</artifactId>
 	<packaging>jar</packaging>
 	<name>REST plugin</name>
-	<version>1.0.0</version>
+	<version>1.0.1-SNAPSHOT</version>
 	<dependencies>
 		<dependency>
 			<groupId>com.soffid.iam.sync</groupId>
@@ -55,7 +55,7 @@
 	</dependencies>
 	<scm>
 		<connection>scm:git:ssh://git@github.com/SoffidIAM/plugin-scim.git</connection>
-		<tag>rest-plugin-1.0.0</tag>
+		<tag>HEAD</tag>
 	</scm>
 	<licenses>
 		<license>
