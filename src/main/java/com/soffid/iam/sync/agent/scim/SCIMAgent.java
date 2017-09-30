@@ -25,9 +25,11 @@ import org.json.JSONObject;
 
 import es.caib.seycon.ng.comu.Account;
 import es.caib.seycon.ng.comu.Grup;
+import es.caib.seycon.ng.comu.ObjectMappingTrigger;
 import es.caib.seycon.ng.comu.Password;
 import es.caib.seycon.ng.comu.Rol;
 import es.caib.seycon.ng.comu.RolGrant;
+import es.caib.seycon.ng.comu.SoffidObjectTrigger;
 import es.caib.seycon.ng.comu.SoffidObjectType;
 import es.caib.seycon.ng.comu.Usuari;
 import es.caib.seycon.ng.exception.InternalErrorException;
@@ -67,17 +69,17 @@ import es.caib.seycon.ng.sync.intf.UserMgr;
 public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, ReconcileMgr2, GroupMgr, RoleMgr,
 	AuthoritativeIdentitySource2 {
 
-	private String EQ_END = "\"";
+	protected String EQ_END = "\"";
 
 	private String EQ_BEGIN = " eq \"";
 
 	private static final long serialVersionUID = 1L;
 
-	ValueObjectMapper vom = new ValueObjectMapper();
+	protected ValueObjectMapper vom = new ValueObjectMapper();
 	
-	ObjectTranslator objectTranslator = null;
+	protected ObjectTranslator objectTranslator = null;
 	
-	boolean debugEnabled;
+	protected boolean debugEnabled;
 	
 	boolean wso2workaround;
 
@@ -96,12 +98,12 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 	
 	String contentType;
 
-	private Collection<ExtensibleObjectMapping> objectMappings;
+	protected Collection<ExtensibleObjectMapping> objectMappings;
 	// --------------------------------------------------------------
 
 	private ClientConfig config;
 
-	private RestClient client;
+	protected RestClient client;
 
 	/**
 	 * Constructor
@@ -148,8 +150,8 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		client = new RestClient(config);
 	}
 
-	boolean moreData = false;
-	String nextChange = null;
+	protected boolean moreData = false;
+	protected String nextChange = null;
 	public Collection<AuthoritativeChange> getChanges(String lastChange)
 			throws InternalErrorException {
 		LinkedList<AuthoritativeChange> changes = new LinkedList<AuthoritativeChange>();
@@ -261,7 +263,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 							try {
 								ExtensibleObject obj = objectTranslator.generateObject(roleObject, eom);
 								if (obj != null)
-									removeObject(obj);
+									removeObject(roleObject, obj);
 							} finally { 
 								eom.setCondition(condition);
 							}
@@ -278,14 +280,14 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		}
 	}
 
-	private void removeObjects(ExtensibleObjects objects) throws InternalErrorException {
+	private void removeObjects(ExtensibleObject soffidObject, ExtensibleObjects objects) throws InternalErrorException {
 		for (ExtensibleObject obj: objects.getObjects())
 		{
-			removeObject (obj);
+			removeObject (soffidObject, obj);
 		}
 	}
 
-	private void removeObject(ExtensibleObject object) throws InternalErrorException {
+	protected void removeObject(ExtensibleObject soffidObject, ExtensibleObject object) throws InternalErrorException {
 		try
 		{
 			ExtensibleObject existingObject = searchJsonObject(object);
@@ -303,34 +305,39 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 					log.info ("Path: "+path);
 				JSONObject obj = (JSONObject) java2json(object);
 				
-				ClientResponse response = client
-						.resource(path)
-						.delete();
-				if (response.getStatusCode() != HttpStatus.OK.getCode() &&
-						response.getStatusCode() != HttpStatus.NO_CONTENT.getCode())
+				if (preDelete(soffidObject, existingObject))
 				{
-					response.consumeContent();
-					throw new InternalErrorException ("Unexpected status "+
-							response.getStatusCode()+":"+
-							response.getStatusType().getReasonPhrase()+" on "+
-							path);
-				}
-				// If the response is no content, it should not be parsed
-				if (response.getStatusCode() == HttpStatus.OK.getCode())
-				{
-					if (wso2workaround)
-						response.consumeContent();
-					else
+			
+					ClientResponse response = client
+							.resource(path)
+							.delete();
+					if (response.getStatusCode() != HttpStatus.OK.getCode() &&
+							response.getStatusCode() != HttpStatus.NO_CONTENT.getCode())
 					{
-						JSONObject result = response.getEntity(JSONObject.class);
-						if (debugEnabled)
-						{
-							log.info ("Response :"+ result.toString(10));
-						}
-						JSONArray errors = result.optJSONArray("Errors");
-						if (errors != null)
-							throw new InternalErrorException ("Error creating object: "+errors);
+						response.consumeContent();
+						throw new InternalErrorException ("Unexpected status "+
+								response.getStatusCode()+":"+
+								response.getStatusType().getReasonPhrase()+" on "+
+								path);
 					}
+					// If the response is no content, it should not be parsed
+					if (response.getStatusCode() == HttpStatus.OK.getCode())
+					{
+						if (wso2workaround)
+							response.consumeContent();
+						else
+						{
+							JSONObject result = response.getEntity(JSONObject.class);
+							if (debugEnabled)
+							{
+								log.info ("Response :"+ result.toString(10));
+							}
+							JSONArray errors = result.optJSONArray("Errors");
+							if (errors != null)
+								throw new InternalErrorException ("Error deletinc object: "+errors);
+						}
+					}
+					postDelete(soffidObject, existingObject);
 				}
 			}
 		}
@@ -360,7 +367,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 						{
 			    			ExtensibleObject obj = objectTranslator.generateObject(sourceObject, mapping);
 			    			if (obj != null)
-			    				updateObject(obj);
+			    				updateObject(sourceObject, obj);
 						}
 						else
 						{
@@ -394,7 +401,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 					try {
 						ExtensibleObject obj = objectTranslator.generateObject(groupObject, eom);
 						if (obj != null)
-							removeObject(obj);
+							removeObject(groupObject, obj);
 					} finally { 
 						eom.setCondition(condition);
 					}
@@ -417,16 +424,18 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 					getServer());
 			for (ExtensibleObjectMapping mapping: objectMappings)
 			{
-				if (mapping.getSoffidObject().equals (SoffidObjectType.OBJECT_GROUP) &&
-						objectTranslator.evalCondition(sourceObject, mapping))
+				if (mapping.getSoffidObject().equals (SoffidObjectType.OBJECT_GROUP))
 				{
-	    			ExtensibleObject obj = objectTranslator.generateObject(sourceObject, mapping);
-	    			if (obj != null)
-	    				updateObject(obj);
-				}
-				else
-				{
-					removeGroup(name);
+					if (objectTranslator.evalCondition(sourceObject, mapping))
+					{
+		    			ExtensibleObject obj = objectTranslator.generateObject(sourceObject, mapping);
+		    			if (obj != null)
+		    				updateObject(sourceObject, obj);
+					}
+					else
+					{
+						removeGroup(name);
+					}
 				}
 			}
 		}
@@ -778,7 +787,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 					try {
 						ExtensibleObject obj = objectTranslator.generateObject(userObject, eom);
 						if (obj != null)
-							removeObject(obj);
+							removeObject(userObject, obj);
 					} finally { 
 						eom.setCondition(condition);
 					}
@@ -806,7 +815,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 					{
 		    			ExtensibleObject obj = objectTranslator.generateObject(sourceObject, mapping);
 		    			if (obj != null)
-		    				updateObject(obj);
+		    				updateObject(sourceObject, obj);
 					}
 					else
 					{
@@ -836,7 +845,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 					{
 		    			ExtensibleObject obj = objectTranslator.generateObject(sourceObject, mapping);
 		    			if (obj != null)
-		    				updateObject(obj);
+		    				updateObject(sourceObject, obj);
 					}
 					else
 					{
@@ -868,7 +877,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		ExtensibleObjects objects =
 				objectTranslator.generateObjects(object);
 		try {
-			updateObjects(objects);
+			updateObjects(object, objects);
 		}
 		catch (InternalErrorException e)
 		{
@@ -896,18 +905,18 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 	}
 
 
-	public void updateObjects (ExtensibleObjects objects)
+	public void updateObjects (ExtensibleObject soffidObject, ExtensibleObjects objects)
 			throws Exception
 	{
 
 		for (ExtensibleObject object : objects.getObjects())
 		{
-			updateObject(object);
+			updateObject(soffidObject, object);
 		}
 	}
 
 	
-	private ExtensibleObject searchJsonObject (ExtensibleObject object) throws InternalErrorException, JSONException, UnsupportedEncodingException
+	protected ExtensibleObject searchJsonObject (ExtensibleObject object) throws InternalErrorException, JSONException, UnsupportedEncodingException
 	{
 		ExtensibleObjectMapping mapping = getMapping(object.getObjectType());
 		String attribute = mapping.getProperties().get("keyAttribute");
@@ -968,7 +977,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		}
 	}
 
-	private String getJsonReference(AttributeReference ar) {
+	protected String getJsonReference(AttributeReference ar) {
 		String ft = null;
 		while (ar != null)
 		{
@@ -984,7 +993,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		return ft;
 	}
 
-	private void json2map(JSONObject jsonObject, Map<String,Object> map) throws JSONException 
+	protected void json2map(JSONObject jsonObject, Map<String,Object> map) throws JSONException 
 	{
 		for ( Iterator it = jsonObject.keys(); it.hasNext(); )
 		{
@@ -1059,7 +1068,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		return getObjectPath(object.getObjectType());
 	}
 
-	private String getObjectPath(String objectType) {
+	protected String getObjectPath(String objectType) {
 		String path = getMapping(objectType).getProperties().get("path");
 		if (path == null)
 			path = objectType;
@@ -1071,7 +1080,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 			return serverUrl + "/" + path;
 	}
 
-	private void updateObject (ExtensibleObject object)
+	protected void updateObject (ExtensibleObject soffidObject, ExtensibleObject object)
 			throws InternalErrorException
 	{
 		try
@@ -1083,28 +1092,32 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 
 				JSONObject obj = (JSONObject) java2json(object);
 				
-				debugObject("Creating object",object, "");
-				ClientResponse response = client
-						.resource(path)
-						.contentType(MediaType.APPLICATION_JSON)
-						.accept(MediaType.APPLICATION_JSON)
-						.post(  obj );
-				if (response.getStatusCode() != HttpStatus.OK.getCode() &&
-						response.getStatusCode() != HttpStatus.CREATED.getCode())
+				if (preInsert(soffidObject, object))
 				{
-					throw new InternalErrorException ("Unexpected status "+
-							response.getStatusCode()+":"+
-							response.getStatusType().getReasonPhrase()+" on "+
-							path+":\n"+response.getEntity(String.class));
+					debugObject("Creating object",object, "");
+					ClientResponse response = client
+							.resource(path)
+							.contentType(MediaType.APPLICATION_JSON)
+							.accept(MediaType.APPLICATION_JSON)
+							.post(  obj );
+					if (response.getStatusCode() != HttpStatus.OK.getCode() &&
+							response.getStatusCode() != HttpStatus.CREATED.getCode())
+					{
+						throw new InternalErrorException ("Unexpected status "+
+								response.getStatusCode()+":"+
+								response.getStatusType().getReasonPhrase()+" on "+
+								path+":\n"+response.getEntity(String.class));
+					}
+					JSONObject result = response.getEntity(JSONObject.class);
+					if (debugEnabled)
+					{
+						log.info ("Result: "+result.toString(10));
+					}
+					JSONArray errors = result.optJSONArray("Errors");
+					if (errors != null)
+						throw new InternalErrorException ("Error creating object: "+errors);
+					postInsert(soffidObject, object, object);
 				}
-				JSONObject result = response.getEntity(JSONObject.class);
-				if (debugEnabled)
-				{
-					log.info ("Result: "+result.toString(10));
-				}
-				JSONArray errors = result.optJSONArray("Errors");
-				if (errors != null)
-					throw new InternalErrorException ("Error creating object: "+errors);
 			}
 			else
 			{
@@ -1128,52 +1141,56 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 					debugObject("No need to update object",object, "");
 					return;
 				}
-				debugObject("Updating object",object, "");
-				if (debugEnabled)
-					log.info ("Path = "+path);
-
-				JSONObject obj = (JSONObject) java2json(existingObject);
-				
-				JSONObject result;
-				ClientResponse response = client
-							.resource(path)
-							.contentType(MediaType.APPLICATION_JSON)
-							.accept(MediaType.APPLICATION_JSON)
-							.put(obj);
-/*
- * 				if (response.getStatusCode() == HttpStatus.FORBIDDEN.getCode())
+				if (preUpdate(soffidObject, object, existingObject))
 				{
-					response.consumeContent();
-					try {
-						result = client
-							.resource(path)
-							.contentType(MediaType.APPLICATION_JSON)
-							.accept(MediaType.APPLICATION_JSON)
-							.invoke ("PATCH", JSONObject.class, obj);
-					} catch (ClientWebException e) {
-						throw new InternalErrorException ("Unexpected status "+
-								e.getResponse().getStatusCode()+":"+
-								e.getResponse().getStatusType().getReasonPhrase()+" on "+
-								path);
+					debugObject("Updating object",object, "");
+					if (debugEnabled)
+						log.info ("Path = "+path);
+	
+					JSONObject obj = (JSONObject) java2json(existingObject);
+					
+					JSONObject result;
+					ClientResponse response = client
+								.resource(path)
+								.contentType(MediaType.APPLICATION_JSON)
+								.accept(MediaType.APPLICATION_JSON)
+								.put(obj);
+	/*
+	 * 				if (response.getStatusCode() == HttpStatus.FORBIDDEN.getCode())
+					{
+						response.consumeContent();
+						try {
+							result = client
+								.resource(path)
+								.contentType(MediaType.APPLICATION_JSON)
+								.accept(MediaType.APPLICATION_JSON)
+								.invoke ("PATCH", JSONObject.class, obj);
+						} catch (ClientWebException e) {
+							throw new InternalErrorException ("Unexpected status "+
+									e.getResponse().getStatusCode()+":"+
+									e.getResponse().getStatusType().getReasonPhrase()+" on "+
+									path);
+						}
 					}
+					else
+					*/
+					if (response.getStatusCode() != HttpStatus.OK.getCode())
+						throw new InternalErrorException ("Unexpected status "+
+									response.getStatusCode()+":"+
+									response.getStatusType().getReasonPhrase()+" on "+
+									path+":\n"+response.getEntity(String.class));
+					else 
+						result = response.getEntity(JSONObject.class);
+	
+					if (debugEnabled)
+					{
+						log.info ("Result: "+result.toString(10));
+					}
+					JSONArray errors = result.optJSONArray("Errors");
+					if (errors != null)
+						throw new InternalErrorException ("Error creating object: "+errors);
+					postUpdate(soffidObject, object, existingObject);
 				}
-				else
-				*/
-				if (response.getStatusCode() != HttpStatus.OK.getCode())
-					throw new InternalErrorException ("Unexpected status "+
-								response.getStatusCode()+":"+
-								response.getStatusType().getReasonPhrase()+" on "+
-								path+":\n"+response.getEntity(String.class));
-				else 
-					result = response.getEntity(JSONObject.class);
-
-				if (debugEnabled)
-				{
-					log.info ("Result: "+result.toString(10));
-				}
-				JSONArray errors = result.optJSONArray("Errors");
-				if (errors != null)
-					throw new InternalErrorException ("Error creating object: "+errors);
 			}
 		}
 		catch (Exception e)
@@ -1184,7 +1201,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		}
 	}
 
-	private ExtensibleObjectMapping getMapping(String objectType) {
+	protected ExtensibleObjectMapping getMapping(String objectType) {
 		for (ExtensibleObjectMapping map: objectMappings)
 		{
 			if ( map.getSystemObject().equals(objectType))
@@ -1269,5 +1286,90 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 	
 	}
 
+	public ExtensibleObject getNativeObject(SoffidObjectType type, String object1, String object2)
+			throws RemoteException, InternalErrorException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	public ExtensibleObject getSoffidObject(SoffidObjectType type, String object1, String object2)
+			throws RemoteException, InternalErrorException {
+		// TODO Auto-generated method stub
+		return null;
+	}
+
+	protected boolean runTrigger (SoffidObjectTrigger triggerType,
+			ExtensibleObject soffidObject,
+			ExtensibleObject newObject,
+			ExtensibleObject oldObject) throws InternalErrorException
+	{
+		SoffidObjectType sot = SoffidObjectType.fromString(soffidObject.getObjectType());
+		for ( ExtensibleObjectMapping eom : objectTranslator.getObjectsBySoffidType(sot))
+		{
+			if (newObject == null || newObject.getObjectType().equals(eom.getSystemObject()))
+			{
+				for ( ObjectMappingTrigger trigger: eom.getTriggers())
+				{
+					if (trigger.getTrigger().equals (triggerType))
+					{
+						ExtensibleObject eo = new ExtensibleObject();
+						eo.setAttribute("source", soffidObject);
+						eo.setAttribute("newObject", newObject);
+						if ( oldObject != null)
+						{
+							eo.setAttribute("oldObject", oldObject);
+						}
+						if ( ! objectTranslator.evalExpression(eo, trigger.getScript()) )
+						{
+							log.info("Trigger "+triggerType+" returned false");
+							if (debugEnabled)
+							{
+								if (oldObject != null)
+									debugObject("old object", oldObject, "  ");
+								if (newObject != null)
+									debugObject("new object", newObject, "  ");
+							}
+							return false;
+						}
+					}
+				}
+			}
+		}
+		return true;
+		
+	}
+
+	protected boolean preUpdate(ExtensibleObject soffidObject,
+			ExtensibleObject adObject, ExtensibleObject currentEntry)
+			throws InternalErrorException {
+		return runTrigger(SoffidObjectTrigger.PRE_UPDATE, soffidObject, adObject, currentEntry);
+	}
+
+	protected boolean preInsert(ExtensibleObject soffidObject,
+			ExtensibleObject adObject) throws InternalErrorException {
+		return runTrigger(SoffidObjectTrigger.PRE_INSERT, soffidObject, adObject, null);
+	}
+
+	protected boolean preDelete(ExtensibleObject soffidObject,
+			ExtensibleObject currentEntry) throws InternalErrorException {
+		return runTrigger(SoffidObjectTrigger.PRE_DELETE, soffidObject, null, currentEntry);
+	}
+
+	protected boolean postUpdate(ExtensibleObject soffidObject,
+			ExtensibleObject adObject, ExtensibleObject currentEntry)
+			throws InternalErrorException {
+		return runTrigger(SoffidObjectTrigger.POST_UPDATE, soffidObject, adObject, currentEntry);
+	}
+
+	protected boolean postInsert(ExtensibleObject soffidObject,
+			ExtensibleObject adObject, ExtensibleObject currentEntry)
+			throws InternalErrorException {
+		return runTrigger(SoffidObjectTrigger.POST_INSERT, soffidObject, adObject, currentEntry);
+	}
+
+	protected boolean postDelete(ExtensibleObject soffidObject,
+			ExtensibleObject currentEntry) throws InternalErrorException {
+		return runTrigger(SoffidObjectTrigger.POST_DELETE, soffidObject,  null, currentEntry);
+	}
 }
 	

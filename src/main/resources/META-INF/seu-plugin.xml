@@ -8,10 +8,12 @@
 	<agent>
 		<name>SCIM</name>
 		<javaClass>com.soffid.iam.sync.agent.scim.SCIMAgent</javaClass>
+		<javaClassV2>com.soffid.iam.sync.agent2.scim.SCIMAgent</javaClassV2>
 		<userInterface>SCIMAgent.zul</userInterface>
 		<enableAccessControl>false</enableAccessControl>
 		<authoritativeSource>true</authoritativeSource>
 		<enableAttributeMapping>true</enableAttributeMapping>
+		<enableObjectTriggers>true</enableObjectTriggers>
 
 		<object systemObject="user" soffidObject="user">
 			<property name="path" value="/Users"/>
