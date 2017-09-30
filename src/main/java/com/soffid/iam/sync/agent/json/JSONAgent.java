@@ -1346,13 +1346,13 @@ public class JSONAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		
 	}
 
-	public ExtensibleObject getNativeObject(com.soffid.iam.api.SoffidObjectType type, String object1, String object2)
+	public ExtensibleObject getNativeObject(SoffidObjectType type, String object1, String object2)
 			throws RemoteException, InternalErrorException {
 		// TODO Auto-generated method stub
 		return null;
 	}
 
-	public ExtensibleObject getSoffidObject(com.soffid.iam.api.SoffidObjectType type, String object1, String object2)
+	public ExtensibleObject getSoffidObject(SoffidObjectType type, String object1, String object2)
 			throws RemoteException, InternalErrorException {
 		// TODO Auto-generated method stub
 		return null;

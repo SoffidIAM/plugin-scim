@@ -7,7 +7,7 @@
 	</parent>
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.soffid.iam.sync.plugins</groupId>
-	<artifactId>rent-plugin</artifactId>
+	<artifactId>rest-plugin</artifactId>
 	<packaging>jar</packaging>
 	<name>REST plugin</name>
 	<version>1.0.0-SNAPSHOT</version>

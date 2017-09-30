@@ -27,7 +27,7 @@ public class JSONAgent extends com.soffid.iam.sync.agent.json.JSONAgent
 	}
 
 
-	public ExtensibleObject getNativeObject(com.soffid.iam.api.SoffidObjectType type, String object1, String object2)
+	public ExtensibleObject getNativeObject(SoffidObjectType type, String object1, String object2)
 			throws RemoteException, InternalErrorException {
 		try {
 			ExtensibleObject sourceObject = getExtensibleObject(type, object1, object2);
@@ -46,7 +46,7 @@ public class JSONAgent extends com.soffid.iam.sync.agent.json.JSONAgent
 		}
 	}
 
-	public ExtensibleObject getSoffidObject(com.soffid.iam.api.SoffidObjectType type, String object1, String object2)
+	public ExtensibleObject getSoffidObject(SoffidObjectType type, String object1, String object2)
 			throws RemoteException, InternalErrorException {
 		try {
 			ExtensibleObject sourceObject = getExtensibleObject(type, object1, object2);
