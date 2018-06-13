@@ -125,7 +125,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		authUrl = getDispatcher().getParam3();
 		serverUrl = getDispatcher().getParam4();
 		debugEnabled = "true".equals(getDispatcher().getParam8());
-		wso2workaround = "true".equals(getDispatcher().getParam8());
+		wso2workaround = "true".equals(getDispatcher().getParam9());
 
 		if (wso2workaround) 
 		{
@@ -910,6 +910,10 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 	private ExtensibleObject searchJsonObject (ExtensibleObject object) throws InternalErrorException, JSONException, UnsupportedEncodingException
 	{
 		ExtensibleObjectMapping mapping = getMapping(object.getObjectType());
+		if (mapping == null)
+		{
+			throw new InternalErrorException ("Unable to find mapping for object type "+object.getObjectType());
+		}
 		String attribute = mapping.getProperties().get("keyAttribute");
 		if (attribute == null)
 			attribute = "externalId";
