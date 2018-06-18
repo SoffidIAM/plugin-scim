@@ -666,12 +666,20 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 						ExtensibleObject scimObj = objectTranslator.generateObject(new RoleExtensibleObject(role, getServer()), mapping);
 						if (scimObj != null)
 						{
+							debugObject("Searching for role "+role+":", scimObj, "");
 							ExtensibleObject scimStoredObject = searchJsonObject(scimObj);
 							if (scimStoredObject != null)
 							{
-								role  = vom.parseRol(objectTranslator.parseInputObject(scimStoredObject, mapping));
+								debugObject("Got SCIM object", scimStoredObject, "");
+								ExtensibleObject parseInputObject = objectTranslator.parseInputObject(scimStoredObject, mapping);
+								debugObject("Parsed soffid role:", parseInputObject, "");
+								role  = vom.parseRol(parseInputObject);
 								if (role != null)
+								{
+									if (debugEnabled)
+										log.info("Result: "+role.toString());
 									return role;
+								}
 							}
 						}
 					} finally {
