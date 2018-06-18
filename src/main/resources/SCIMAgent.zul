@@ -3,6 +3,27 @@
 <?component name="input_dada" macro-uri="comu/input_dada.zul"?>
 <?component name="input_etiqueta" macro-uri="comu/input_etiqueta.zul"?>
 <?component name="input_password" macro-uri="comu/input_password.zul"?>
+<frame xmlns:h="http://www.w3.org/1999/xhtml" style="margin:0 ;padding:0; width:100%;">
+
+<zscript>
+<![CDATA[
+
+	void manageAttributesForAuthType() {
+		if (self.getSelectedItem()==null) {
+			System.out.println("manageAttributesForAuthType - self.getSelectedItem()="+self.getSelectedItem());
+			userRow.setVisible(true);
+			passRow.setVisible(true);
+			authURLRow.setVisible(true);
+		} else {
+			System.out.println("manageAttributesForAuthType - self.getSelectedItem().getValue()="+self.getSelectedItem().getValue());
+			userRow.setVisible(self.getSelectedItem()!=null && !"".equals(self.getSelectedItem().getValue()));
+			passRow.setVisible(self.getSelectedItem()!=null && !"".equals(self.getSelectedItem().getValue()));
+			authURLRow.setVisible(self.getSelectedItem()!=null && ("token".equals(self.getSelectedItem().getValue()) || "tokenBasic".equals(self.getSelectedItem().getValue())));
+		}
+	}
+
+]]>
+</zscript>
 
 <grid width="99%">
 	<columns visible="false"><column width="14%"/><column/> </columns>
@@ -15,30 +36,17 @@
 			</hbox>
 		</row>
 		<row>
-			<input_etiqueta value="User name" />
-			<hbox width="90%">
-				<input_dada bind="@param0" lectura="${!canModifyAgent}"
-					width_custom="98%" />
-			</hbox>
-		</row>
-		<row>
-			<input_etiqueta value="Password" />
-			<hbox width="90%">
-				<input_password bind="@param1" lectura="${!canModifyAgent}"
-					width_custom="98%" />
-			</hbox>
-		</row>
-		<row>
 			<input_etiqueta value="Authentication method" />
 			<listbox bind="@param2" mold="select"  disabled="{!canModifyAgent}" width="100px">
-				<attribute name="onSelect">
-				<![CDATA[
-					authurlrow.setVisible ( self.getSelectedItem() != null && "token".equals(self.getSelectedItem().getValue()) );
-				]]>
-				</attribute>
 				<attribute name="onCreate">
 				<![CDATA[
-					authurlrow.setVisible (  self.getSelectedItem() != null && "token".equals(self.getSelectedItem().getValue()) );
+					manageAttributesForAuthType();
+				]]>
+				</attribute>
+				<attribute name="onSelect">
+				<![CDATA[
+					System.out.println("onSelect");
+					manageAttributesForAuthType();
 				]]>
 				</attribute>
 				<listitem value="">
@@ -50,9 +58,26 @@
 				<listitem value="token">
 					<listcell label="Token"/>
 				</listitem>
+				<listitem value="tokenBasic">
+					<listcell label="TokenBasic"/>
+				</listitem>
 			</listbox>
 		</row>
-		<row id="authurlrow">
+		<row id="userRow">
+			<input_etiqueta value="User name" />
+			<hbox width="90%">
+				<input_dada bind="@param0" lectura="${!canModifyAgent}"
+					width_custom="98%" />
+			</hbox>
+		</row>
+		<row id="passRow">
+			<input_etiqueta value="Password" />
+			<hbox width="90%">
+				<input_password bind="@param1" lectura="${!canModifyAgent}"
+					width_custom="98%" />
+			</hbox>
+		</row>
+		<row id="authURLRow">
 			<input_etiqueta value="Authentication URL" />
 			<hbox width="90%">
 				<input_dada bind="@param3" lectura="${!canModifyAgent}"
@@ -83,3 +108,4 @@
 		</row>
 	</rows>
 </grid>
+</frame>

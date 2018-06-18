@@ -1,6 +1,5 @@
 package com.soffid.iam.sync.agent.scim;
 
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.rmi.RemoteException;
@@ -32,7 +31,6 @@ import es.caib.seycon.ng.comu.SoffidObjectType;
 import es.caib.seycon.ng.comu.Usuari;
 import es.caib.seycon.ng.exception.InternalErrorException;
 import es.caib.seycon.ng.exception.UnknownUserException;
-import es.caib.seycon.ng.remote.RemoteServiceLocator;
 import es.caib.seycon.ng.sync.agent.Agent;
 import es.caib.seycon.ng.sync.engine.extobj.AccountExtensibleObject;
 import es.caib.seycon.ng.sync.engine.extobj.AttributeReference;
@@ -70,8 +68,6 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 	private String EQ_END = "\"";
 
 	private String EQ_BEGIN = " eq \"";
-
-	private static final long serialVersionUID = 1L;
 
 	ValueObjectMapper vom = new ValueObjectMapper();
 	
@@ -134,6 +130,11 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		}
 		// create a client to send the user/group crud requests
 		config = new ApacheHttpClientConfig(new DefaultHttpClient());
+		if ("tokenBasic".equals(authMethod))
+		{
+			TokenBasicHandler handler = new TokenBasicHandler(authUrl, loginDN, password.getPassword());
+			config.handlers(handler);
+		}
 		if ("token".equals(authMethod))
 		{
 			TokenHandler handler = new TokenHandler (authUrl, loginDN, password.getPassword());
@@ -278,13 +279,6 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		}
 	}
 
-	private void removeObjects(ExtensibleObjects objects) throws InternalErrorException {
-		for (ExtensibleObject obj: objects.getObjects())
-		{
-			removeObject (obj);
-		}
-	}
-
 	private void removeObject(ExtensibleObject object) throws InternalErrorException {
 		try
 		{
@@ -301,8 +295,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 
 				if (debugEnabled)
 					log.info ("Path: "+path);
-				JSONObject obj = (JSONObject) java2json(object);
-				
+
 				ClientResponse response = client
 						.resource(path)
 						.delete();
@@ -438,6 +431,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		}
 	}
 
+	@SuppressWarnings("rawtypes")
 	public List<RolGrant> getAccountGrants(String accountName) throws RemoteException,
 			InternalErrorException {
 		Account account = new Account();
@@ -461,6 +455,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 							ExtensibleObject scimStoredObject = searchJsonObject(scimObj);
 							if (scimStoredObject != null)
 							{
+								@SuppressWarnings("unchecked")
 								List<Object> groups = (List<Object>) scimStoredObject.get("groups");
 								if (groups != null)
 								{
@@ -988,6 +983,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		return ft;
 	}
 
+	@SuppressWarnings("rawtypes")
 	private void json2map(JSONObject jsonObject, Map<String,Object> map) throws JSONException 
 	{
 		for ( Iterator it = jsonObject.keys(); it.hasNext(); )
@@ -1024,6 +1020,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		}
 	}
 
+	@SuppressWarnings("rawtypes")
 	private void map2json(Map<String,Object> map, JSONObject jsonObject) throws JSONException 
 	{
 		for ( Iterator it = map.keySet().iterator(); it.hasNext(); )
@@ -1035,6 +1032,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		
 	}
 
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	private Object java2json(Object javaObject) throws JSONException {
 		if (javaObject instanceof Map)
 		{
@@ -1202,6 +1200,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		debugObject(msg, obj, indent, "");
 	}
 	
+	@SuppressWarnings({ "unchecked", "rawtypes" })
 	void debugObject (String msg, Object obj, String indent, String attributeName)
 	{
 		if (debugEnabled)
