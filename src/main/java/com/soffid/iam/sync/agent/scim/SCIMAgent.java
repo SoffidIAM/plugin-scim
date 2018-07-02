@@ -73,7 +73,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 
 	private static final long serialVersionUID = 1L;
 
-	ValueObjectMapper vom = new ValueObjectMapper();
+	protected ValueObjectMapper vom = new ValueObjectMapper();
 	
 	protected ObjectTranslator objectTranslator = null;
 	
@@ -484,13 +484,12 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 										String ref= null;
 										if (group instanceof Map)
 										{
-											if (wso2workaround)
-											{
-												id = (String) ((Map)group).get("value");
-											} else {
+											id = (String) ((Map)group).get("value");
+											if (id == null)
 												id = (String) ((Map)group).get("id");
-												ref = (String) ((Map)group).get("ref");
-											}
+											ref = (String) ((Map)group).get("ref");
+											if (ref == null)
+												ref = (String) ((Map)group).get("$ref");
 										}
 										else
 											id = group.toString();
