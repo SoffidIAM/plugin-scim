@@ -3,7 +3,6 @@ package com.soffid.iam.sync.agent2.scim;
 import java.rmi.RemoteException;
 import java.util.Collection;
 import java.util.LinkedList;
-import java.util.Map;
 
 import javax.ws.rs.core.MediaType;
 
@@ -17,8 +16,6 @@ import com.soffid.iam.api.CustomObject;
 import com.soffid.iam.api.SoffidObjectType;
 import com.soffid.iam.sync.intf.CustomObjectMgr;
 
-import es.caib.seycon.ng.comu.Grup;
-import es.caib.seycon.ng.comu.Usuari;
 import es.caib.seycon.ng.exception.InternalErrorException;
 import es.caib.seycon.ng.sync.engine.extobj.AttributeReference;
 import es.caib.seycon.ng.sync.engine.extobj.AttributeReferenceParser;
@@ -26,7 +23,6 @@ import es.caib.seycon.ng.sync.engine.extobj.CustomExtensibleObject;
 import es.caib.seycon.ng.sync.intf.AuthoritativeChange;
 import es.caib.seycon.ng.sync.intf.ExtensibleObject;
 import es.caib.seycon.ng.sync.intf.ExtensibleObjectMapping;
-import es.caib.seycon.ng.sync.intf.ExtensibleObjects;
 
 public class SCIMAgent extends com.soffid.iam.sync.agent.scim.SCIMAgent 
 	implements CustomObjectMgr

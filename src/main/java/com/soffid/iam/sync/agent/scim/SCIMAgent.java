@@ -15,6 +15,7 @@ import javax.ws.rs.core.MediaType;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.wink.client.ClientConfig;
 import org.apache.wink.client.ClientResponse;
+import org.apache.wink.client.Resource;
 import org.apache.wink.client.RestClient;
 import org.apache.wink.client.httpclient.ApacheHttpClientConfig;
 import org.apache.wink.common.http.HttpStatus;
@@ -910,6 +911,41 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		this.objectTranslator = new ObjectTranslator(getDispatcher(), getServer(), mapping);
 		objectTranslator.setObjectFinder(new ExtensibleObjectFinder() {
 			
+			public Collection<Map<String,Object>> invoke (String verb, String command, Map<String, Object> params) throws InternalErrorException
+			{
+				if (debugEnabled)
+				{
+					log.info ("Invoking: "+verb+" on "+command);
+				}
+
+				Resource resource = client
+						.resource(command)
+						.contentType(MediaType.APPLICATION_JSON)
+						.accept(MediaType.APPLICATION_JSON);
+				
+				JSONObject result = resource.invoke( verb, JSONObject.class,  
+						params == null ? null : new JSONObject(params));
+				
+				if (debugEnabled && result != null)
+				{
+					try {
+						log.info ("Result: "+result.toString(10));
+					} catch (JSONException e) {
+						log.info("Error displaying response: ", e);
+					}
+				}
+				
+				HashMap<String, Object> eo = new HashMap<String, Object>();
+				try {
+					json2map (result, eo);
+				} catch (JSONException e) {
+					throw new InternalErrorException("Error decoding response", e);
+				}
+				LinkedList<Map<String,Object>> r = new LinkedList<Map<String,Object>>();
+				r.add(eo);
+				return r;
+			}
+
 			public ExtensibleObject find(ExtensibleObject pattern) throws Exception {
 				return searchJsonObject(pattern);
 			}
