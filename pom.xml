@@ -40,12 +40,12 @@
 		<dependency>
 		    <groupId>com.sun.jersey</groupId>
 		    <artifactId>jersey-client</artifactId>
-		    <version>1.12</version>
+		    <version>1.19.4</version>
 		</dependency>
 		<dependency>
 		    <groupId>com.sun.jersey</groupId>
 		    <artifactId>jersey-core</artifactId>
-		    <version>1.12</version>
+		    <version>1.19.4</version>
 		</dependency>
 		<dependency>
 			<groupId>commons-codec</groupId>
@@ -84,7 +84,7 @@
 									<include>org.apache.wink:wink-client-apache-httpclient</include>
 									<include>org.apache.wink:wink-json-provider</include>
 									<include>org.json:json</include>
-									<include>javax.ws.rs:jsr311-api</include>
+									<!--  include>javax.ws.rs:jsr311-api</include  -->
 									<include>com.sun.xml.bind:jaxb-impl</include>
 									<include>com.sun.xml.bind:jaxb-api</include>
 									<include>javax.activation:activation</include>
