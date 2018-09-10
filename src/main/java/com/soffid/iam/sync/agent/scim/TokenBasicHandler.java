@@ -35,6 +35,24 @@ public class TokenBasicHandler extends AbstractAuthSecurityHandler implements Cl
 	}
 
 	public ClientResponse handle(ClientRequest request, HandlerContext context) throws Exception {
+		addHeader(request);
+		logger.trace("Entering BasicAuthSecurityHandler.doChain()");
+		try {
+	        ClientResponse response = context.doChain(request);
+	        if (response.getStatusCode() == HttpStatus. UNAUTHORIZED.getCode()) {
+				authToken = null;
+				addHeader(request);
+		        response = context.doChain(request);
+	        }
+			return  response;
+		} catch (Exception th) {
+			authToken = null;
+			throw th;
+		}
+			
+	}
+
+	private void addHeader(ClientRequest request) {
 		if (authToken == null)
 			getAuthToken();
 		if (authToken != null) {
@@ -47,8 +65,6 @@ public class TokenBasicHandler extends AbstractAuthSecurityHandler implements Cl
 				request.getHeaders().putSingle("Authorization", auth);
 			}
 		}
-		logger.trace("Entering BasicAuthSecurityHandler.doChain()");
-		return  context.doChain(request);
 	}
 
 	private void getAuthToken() {
