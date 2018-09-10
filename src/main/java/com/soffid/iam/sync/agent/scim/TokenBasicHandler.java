@@ -56,10 +56,10 @@ public class TokenBasicHandler extends AbstractAuthSecurityHandler implements Cl
 		config.handlers(new BasicAuthSecurityHandler(this.user, this.password));
 
 		String basic = getEncodedString(this.user, this.password);
-		System.out.println("TokenHandler.getAuthToken() - user="+user);
-		System.out.println("TokenHandler.getAuthToken() - password="+password);
-		System.out.println("TokenHandler.getAuthToken() - basic="+basic);
-		System.out.println("TokenHandler.getAuthToken() - tokenURL="+tokenURL);
+//		System.out.println("TokenHandler.getAuthToken() - user="+user);
+//		System.out.println("TokenHandler.getAuthToken() - password="+password);
+//		System.out.println("TokenHandler.getAuthToken() - basic="+basic);
+//		System.out.println("TokenHandler.getAuthToken() - tokenURL="+tokenURL);
 		RestClient client = new RestClient(config);
 		Resource resource = client.resource(tokenURL);
 		ClientResponse response = resource
