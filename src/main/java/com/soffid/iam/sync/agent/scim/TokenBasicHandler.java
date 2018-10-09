@@ -40,7 +40,10 @@ public class TokenBasicHandler extends AbstractAuthSecurityHandler implements Cl
 		try {
 	        ClientResponse response = context.doChain(request);
 	        if (response.getStatusCode() == HttpStatus. UNAUTHORIZED.getCode()) {
+            	response.consumeContent();
+            	logger.info("Receixed uauthorized. Renewing token");
 				authToken = null;
+				request.getHeaders().remove("Authorization");
 				addHeader(request);
 		        response = context.doChain(request);
 	        }
@@ -71,6 +74,7 @@ public class TokenBasicHandler extends AbstractAuthSecurityHandler implements Cl
 		ClientConfig config = new ClientConfig();
 		config.handlers(new BasicAuthSecurityHandler(this.user, this.password));
 
+		logger.info("Requesting token");
 		String basic = getEncodedString(this.user, this.password);
 //		System.out.println("TokenHandler.getAuthToken() - user="+user);
 //		System.out.println("TokenHandler.getAuthToken() - password="+password);
@@ -96,5 +100,6 @@ public class TokenBasicHandler extends AbstractAuthSecurityHandler implements Cl
 			System.out.println("TokenHandler.getAuthToken() - response.getMessage()="+response.getMessage());
 			throw new ClientAuthenticationException("Unable to get auth token. Server returned "+response.getMessage());
 		}
+		logger.info("Got token " + authToken);
 	}
 }
