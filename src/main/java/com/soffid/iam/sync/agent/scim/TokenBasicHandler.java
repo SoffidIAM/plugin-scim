@@ -35,6 +35,27 @@ public class TokenBasicHandler extends AbstractAuthSecurityHandler implements Cl
 	}
 
 	public ClientResponse handle(ClientRequest request, HandlerContext context) throws Exception {
+		addHeader(request);
+		logger.trace("Entering BasicAuthSecurityHandler.doChain()");
+		try {
+	        ClientResponse response = context.doChain(request);
+	        if (response.getStatusCode() == HttpStatus. UNAUTHORIZED.getCode()) {
+            	response.consumeContent();
+            	logger.info("Receixed uauthorized. Renewing token");
+				authToken = null;
+				request.getHeaders().remove("Authorization");
+				addHeader(request);
+		        response = context.doChain(request);
+	        }
+			return  response;
+		} catch (Exception th) {
+			authToken = null;
+			throw th;
+		}
+			
+	}
+
+	private void addHeader(ClientRequest request) {
 		if (authToken == null)
 			getAuthToken();
 		if (authToken != null) {
@@ -47,19 +68,18 @@ public class TokenBasicHandler extends AbstractAuthSecurityHandler implements Cl
 				request.getHeaders().putSingle("Authorization", auth);
 			}
 		}
-		logger.trace("Entering BasicAuthSecurityHandler.doChain()");
-		return  context.doChain(request);
 	}
 
 	private void getAuthToken() {
 		ClientConfig config = new ClientConfig();
 		config.handlers(new BasicAuthSecurityHandler(this.user, this.password));
 
+		logger.info("Requesting token");
 		String basic = getEncodedString(this.user, this.password);
-		System.out.println("TokenHandler.getAuthToken() - user="+user);
-		System.out.println("TokenHandler.getAuthToken() - password="+password);
-		System.out.println("TokenHandler.getAuthToken() - basic="+basic);
-		System.out.println("TokenHandler.getAuthToken() - tokenURL="+tokenURL);
+//		System.out.println("TokenHandler.getAuthToken() - user="+user);
+//		System.out.println("TokenHandler.getAuthToken() - password="+password);
+//		System.out.println("TokenHandler.getAuthToken() - basic="+basic);
+//		System.out.println("TokenHandler.getAuthToken() - tokenURL="+tokenURL);
 		RestClient client = new RestClient(config);
 		Resource resource = client.resource(tokenURL);
 		ClientResponse response = resource
@@ -80,5 +100,6 @@ public class TokenBasicHandler extends AbstractAuthSecurityHandler implements Cl
 			System.out.println("TokenHandler.getAuthToken() - response.getMessage()="+response.getMessage());
 			throw new ClientAuthenticationException("Unable to get auth token. Server returned "+response.getMessage());
 		}
+		logger.info("Got token " + authToken);
 	}
 }
