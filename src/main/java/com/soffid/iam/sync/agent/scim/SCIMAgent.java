@@ -475,65 +475,93 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 							ExtensibleObject scimStoredObject = searchJsonObject(scimObj);
 							if (scimStoredObject != null)
 							{
-								@SuppressWarnings("unchecked")
-								List<Object> groups = (List<Object>) scimStoredObject.get("groups");
-								if (groups != null)
-								{
-									for (Object group: groups)
-									{
-										String id;
-										String ref= null;
-										if (group instanceof Map)
-										{
-											id = (String) ((Map)group).get("value");
-											if (id == null)
-												id = (String) ((Map)group).get("id");
-											ref = (String) ((Map)group).get("ref");
-											if (ref == null)
-												ref = (String) ((Map)group).get("$ref");
+								String multidomain = mapping.getProperties().get("multidomain");
+
+								if ("true".equals(multidomain)) {
+									@SuppressWarnings("unchecked")
+									HashMap hm = (HashMap) scimStoredObject.get("urn:scim:schemas:extension:custom:1.0");
+									if (hm != null) {
+										List<HashMap> lhm = (List<HashMap>) hm.get("customers");
+										for (HashMap ihm : lhm) {
+											Object holder = (Object) ihm.get("code");
+											if (holder instanceof JSONObject)
+												break;
+											List<String> lhm2 = (List<String>) ihm.get("groups");
+											for (String role : lhm2) {
+												if (role.isEmpty())
+													break;
+												RolGrant rg = new RolGrant();
+												rg.setDispatcher(getCodi());
+												rg.setEnabled(true);
+												rg.setOwnerAccountName(accountName);
+												rg.setOwnerDispatcher(getCodi());
+												rg.setRolName(role);
+												rg.setHolderGroup(holder.toString());
+												rg.setDomainValue(holder.toString());
+												grants.add(rg);
+											}
 										}
-										else
-											id = group.toString();
-										if (ref != null || id != null)
+									}
+								} else {
+									@SuppressWarnings("unchecked")
+									List<Object> groups = (List<Object>) scimStoredObject.get("groups");
+									if (groups != null)
+									{
+										for (Object group: groups)
 										{
-											for (ExtensibleObjectMapping roleMapping: objectMappings)
+											String id;
+											String ref= null;
+											if (group instanceof Map)
 											{
-												if ( roleMapping.getSoffidObject().equals (SoffidObjectType.OBJECT_ROLE))
+												id = (String) ((Map)group).get("value");
+												if (id == null)
+													id = (String) ((Map)group).get("id");
+												ref = (String) ((Map)group).get("ref");
+												if (ref == null)
+													ref = (String) ((Map)group).get("$ref");
+											}
+											else
+												id = group.toString();
+											if (ref != null || id != null)
+											{
+												for (ExtensibleObjectMapping roleMapping: objectMappings)
 												{
-													if (ref == null)
-														ref = getObjectPath(roleMapping.getSystemObject()) + "/"+id;
-													
-													ClientResponse response = client
-															.resource(ref)
-															.accept(MediaType.APPLICATION_JSON)
-															.get();
-													if (response.getStatusCode() != HttpStatus.OK.getCode())
+													if ( roleMapping.getSoffidObject().equals (SoffidObjectType.OBJECT_ROLE))
 													{
-														response.consumeContent();
-														throw new InternalErrorException ("Unexpected status "+
-																response.getStatusCode()+":"+
-																response.getStatusType().getReasonPhrase()+" on "+
-																ref);
-													}
-													
-													ExtensibleObject gotRole = new ExtensibleObject();
-													gotRole.setObjectType(roleMapping.getSystemObject());
-													json2map(response.getEntity(JSONObject.class), gotRole);
-													Rol r = vom.parseRol(objectTranslator.parseInputObject(gotRole,roleMapping));
-													if (r != null)
-													{
-														RolGrant rg = new RolGrant();
-														rg.setDispatcher(getCodi());
-														rg.setEnabled(true);
-														rg.setOwnerAccountName(accountName);
-														rg.setOwnerDispatcher(getCodi());
-														rg.setRolName(r.getNom());
-														grants.add(rg);
+														if (ref == null)
+															ref = getObjectPath(roleMapping.getSystemObject()) + "/"+id;
+
+														ClientResponse response = client
+																.resource(ref)
+																.accept(MediaType.APPLICATION_JSON)
+																.get();
+														if (response.getStatusCode() != HttpStatus.OK.getCode())
+														{
+															response.consumeContent();
+															throw new InternalErrorException ("Unexpected status "+
+																	response.getStatusCode()+":"+
+																	response.getStatusType().getReasonPhrase()+" on "+
+																	ref);
+														}
+
+														ExtensibleObject gotRole = new ExtensibleObject();
+														gotRole.setObjectType(roleMapping.getSystemObject());
+														json2map(response.getEntity(JSONObject.class), gotRole);
+														Rol r = vom.parseRol(objectTranslator.parseInputObject(gotRole,roleMapping));
+														if (r != null)
+														{
+															RolGrant rg = new RolGrant();
+															rg.setDispatcher(getCodi());
+															rg.setEnabled(true);
+															rg.setOwnerAccountName(accountName);
+															rg.setOwnerDispatcher(getCodi());
+															rg.setRolName(r.getNom());
+															grants.add(rg);
+														}
 													}
 												}
 											}
 										}
-												
 									}
 								}
 							}
