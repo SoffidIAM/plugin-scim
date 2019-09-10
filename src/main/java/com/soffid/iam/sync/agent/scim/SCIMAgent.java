@@ -19,9 +19,12 @@ import org.apache.wink.client.Resource;
 import org.apache.wink.client.RestClient;
 import org.apache.wink.client.httpclient.ApacheHttpClientConfig;
 import org.apache.wink.common.http.HttpStatus;
+import org.bouncycastle.asn1.ocsp.ServiceLocator;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import com.soffid.iam.sync.ServerServiceLocator;
 
 import es.caib.seycon.ng.comu.Account;
 import es.caib.seycon.ng.comu.Grup;
@@ -484,8 +487,25 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 										List<HashMap> lhm = (List<HashMap>) hm.get("customers");
 										for (HashMap ihm : lhm) {
 											Object holder = (Object) ihm.get("code");
-											if (holder instanceof JSONObject)
+
+											// If no group is found in JSON, do nothing
+											if (holder instanceof JSONObject) {
+												if (debugEnabled)
+													log.warn("The grant has been SKIPPED, the attribute 'code' was not found in the response");
 												break;
+											}
+
+											// If no group is found in Soffid, do nothing
+											Grup g = null;
+											try {
+												g = getServer().getGroupInfo(holder.toString(), getDispatcher().getCodi());
+											} catch(Exception e) {}
+											if (g==null) {
+												if (debugEnabled)
+													log.warn("The grant has been SKIPPED, the group '"+holder.toString()+"' of the attribute 'code' was not found in the groups of Soffid");
+												break;
+											}
+
 											List<String> lhm2 = (List<String>) ihm.get("groups");
 											for (String role : lhm2) {
 												if (role.isEmpty())
