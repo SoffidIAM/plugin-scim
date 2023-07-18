@@ -103,7 +103,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 	protected Collection<ExtensibleObjectMapping> objectMappings;
 	// --------------------------------------------------------------
 
-	private ClientConfig config;
+	private ApacheHttpClientConfig config;
 
 	protected RestClient client;
 
@@ -153,7 +153,7 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 			BasicAuthSecurityHandler handler = new BasicAuthSecurityHandler(loginDN, password.getPassword());
 			config.handlers(handler);
 		}
-		
+		config.setChunked(false);
 		client = new RestClient(config);
 	}
 
@@ -841,7 +841,8 @@ public class SCIMAgent extends Agent implements ExtensibleObjectMgr, UserMgr, Re
 		try {
 			for (ExtensibleObjectMapping eom: objectMappings)
 			{
-				if (! "true".equals( eom.getProperties().get("preventDeletion")))
+				if (eom.getSoffidObject().equals(SoffidObjectType.OBJECT_ACCOUNT)  &&
+						! "true".equals( eom.getProperties().get("preventDeletion")))
 				{
 					String condition = eom.getCondition();
 					eom.setCondition(null);
